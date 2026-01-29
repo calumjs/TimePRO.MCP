@@ -447,14 +447,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           breakMinutes
         );
 
-        // Get rate for this client
-        let sellPrice: number | undefined;
-        try {
-          const rate = await client.getClientRate(clientId);
-          sellPrice = rate.SellPrice;
-        } catch {
-          // Rate lookup may fail, continue without it
-        }
+        // Get rate for this client (required by TimePRO)
+        const rateInfo = await client.getClientRate(clientId);
+        const sellPrice = rateInfo.Rate;
 
         const timesheet: TimesheetDto = {
           EmpID: empId,

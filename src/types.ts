@@ -125,6 +125,10 @@ export interface ApiResponse<T> {
 
 // Client rate response
 export interface ClientRate {
-  SellPrice: number;
-  BillableID: string;
+  EmpID: string;
+  ClientID: string;
+  Rate: number;
+  PrepaidRate: number;
+  ClientRateID: number;
+  ExpiryDate: string;
 }
