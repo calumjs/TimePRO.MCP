@@ -300,6 +300,15 @@ function calculateHours(
   return { total, billable: total };
 }
 
+// Helper to format time for API (HH:MM -> HH:MM:SS)
+function formatTime(time: string): string {
+  // If already has seconds, return as-is
+  if (time.split(":").length === 3) {
+    return time;
+  }
+  return `${time}:00`;
+}
+
 // Register tool call handler
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
@@ -457,8 +466,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ProjectID: projectId,
           CategoryID: categoryId,
           DateCreated: date,
-          StartTime: startTime,
-          EndTime: endTime,
+          StartTime: formatTime(startTime),
+          EndTime: formatTime(endTime),
           TimeLess: breakMinutes,
           TimeTotal: total,
           TimeBillable: billable,
@@ -531,8 +540,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ProjectID: projectId,
           CategoryID: categoryId,
           DateCreated: date,
-          StartTime: startTime,
-          EndTime: endTime,
+          StartTime: formatTime(startTime),
+          EndTime: formatTime(endTime),
           TimeLess: breakMinutes,
           TimeTotal: total,
           TimeBillable: billable,
