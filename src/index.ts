@@ -190,7 +190,7 @@ const tools = [
         },
         billable_id: {
           type: "string",
-          description: "Billable category ID (optional, usually auto-determined)",
+          description: "Billing type (auto-set based on client): 'B'=Billable (green, client work), 'W'=WriteOff (black, internal), 'BPP'=Prepaid (green). SSW client defaults to 'W', others to 'B'. Override only if needed.",
         },
         note: {
           type: "string",
@@ -474,13 +474,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Convert break from minutes to hours for the API
         const breakHours = breakMinutes / 60;
 
+        // Determine BillableID: SSW = internal (W=WriteOff), others = client work (B=Billable)
+        // This determines the color: W=black (internal), B=green (client work)
+        const defaultBillableId = clientId.toUpperCase() === "SSW" ? "W" : "B";
+        const finalBillableId = billableId || defaultBillableId;
+
         const timesheet: TimesheetDto = {
           EmpID: empId,
           ClientID: clientId,
           ProjectID: projectId,
           CategoryID: categoryId,
           LocationID: locationId,
-          BillableID: billableId,
+          BillableID: finalBillableId,
           DateCreated: date,
           TimeStart: formatDateTime(date, startTime),
           TimeEnd: formatDateTime(date, endTime),
