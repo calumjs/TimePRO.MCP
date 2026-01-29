@@ -377,7 +377,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const endTime = args?.end_time;
                 const breakMinutes = args?.break_minutes || 0;
                 const locationId = args?.location_id;
-                const billableId = args?.billable_id;
+                // Normalize billable_id: treat empty string, null, undefined all as "not provided"
+                const rawBillableId = args?.billable_id;
+                const billableId = (typeof rawBillableId === 'string' && rawBillableId.trim() !== '')
+                    ? rawBillableId.trim()
+                    : undefined;
                 const note = args?.note;
                 if (!clientId ||
                     !projectId ||
@@ -461,7 +465,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     ? args.break_minutes
                     : existing.TimeLess; // Already in minutes from API
                 const locationId = args?.location_id || existing.LocationID;
-                const billableId = args?.billable_id || existing.BillableID;
+                // Normalize billable_id: treat empty string as "use existing"
+                const rawBillableId = args?.billable_id;
+                const billableId = (typeof rawBillableId === 'string' && rawBillableId.trim() !== '')
+                    ? rawBillableId.trim()
+                    : existing.BillableID;
                 const note = args?.note !== undefined
                     ? args.note
                     : existing.Note;
