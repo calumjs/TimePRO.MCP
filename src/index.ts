@@ -56,13 +56,13 @@ const tools = [
   {
     name: "list_clients",
     description:
-      "Search for clients to use in timesheets. Returns a list of clients with their IDs and names.",
+      "Search for clients/customers to use in timesheets. Returns array with Value (client ID string like 'SSW' or 'LR8R0L') and Text (display name). Use the Value field as client_id when creating timesheets.",
     inputSchema: {
       type: "object" as const,
       properties: {
         search_text: {
           type: "string",
-          description: "Optional text to filter clients by name",
+          description: "Filter clients by name (optional). Leave empty to list all clients.",
         },
       },
     },
@@ -70,13 +70,13 @@ const tools = [
   {
     name: "list_projects",
     description:
-      "Get projects for a specific client. Use this after selecting a client to find available projects.",
+      "Get projects for a specific client. Returns array with ProjectID (string like 'TP' or 'BM1001') and ProjectName. Use ProjectID as project_id when creating timesheets. Must call list_clients first to get the client_id.",
     inputSchema: {
       type: "object" as const,
       properties: {
         client_id: {
           type: "string",
-          description: "The client ID to get projects for (e.g., 'SSW')",
+          description: "Client ID from list_clients Value field (e.g., 'SSW', 'LR8R0L')",
         },
       },
       required: ["client_id"],
@@ -85,7 +85,7 @@ const tools = [
   {
     name: "list_categories",
     description:
-      "Get available timesheet categories (e.g., Development, Meeting, Admin). These categorize the type of work done.",
+      "Get available timesheet categories. Returns array with CategoryID (string like 'BOT', 'MTAS', 'WEBDEV') and CategoryName. Common categories: BOT=Bot Development, MTAS=Meeting, WEBDEV=Web Development, ADMIN=Administration. Use CategoryID as category_id when creating timesheets.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -94,7 +94,7 @@ const tools = [
   {
     name: "list_locations",
     description:
-      "Get available work locations (e.g., Office, Client Site, Remote).",
+      "Get available work locations. Returns array with LocationID (string like 'SSW', 'Client', 'Home') and LocationName. Use LocationID as location_id when creating timesheets.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -103,13 +103,13 @@ const tools = [
   {
     name: "get_timesheet_defaults",
     description:
-      "Get default values for creating a timesheet, including last used client, project, and rates. Call this before creating a timesheet to get sensible defaults.",
+      "Get default values for creating a timesheet, including last used client, project, categories, locations, and billing rates. Useful for pre-populating timesheet forms.",
     inputSchema: {
       type: "object" as const,
       properties: {
         date: {
           type: "string",
-          description: "Date for the timesheet in YYYY-MM-DD format",
+          description: "Date in YYYY-MM-DD format (e.g., '2025-01-29')",
         },
       },
       required: ["date"],
@@ -118,17 +118,17 @@ const tools = [
   {
     name: "list_timesheets",
     description:
-      "List timesheets for the current user within a date range. Returns summary information for each timesheet.",
+      "List timesheets for the current user within a date range. Returns calendar-style summary with: id (numeric timesheet ID), title (client and project name), start/end (datetime strings). Use get_timesheet with the id to get full details.",
     inputSchema: {
       type: "object" as const,
       properties: {
         start_date: {
           type: "string",
-          description: "Start date in YYYY-MM-DD format",
+          description: "Start date in YYYY-MM-DD format (e.g., '2025-01-01')",
         },
         end_date: {
           type: "string",
-          description: "End date in YYYY-MM-DD format",
+          description: "End date in YYYY-MM-DD format (e.g., '2025-01-31')",
         },
       },
       required: ["start_date", "end_date"],
@@ -137,13 +137,13 @@ const tools = [
   {
     name: "get_timesheet",
     description:
-      "Get full details of a specific timesheet by its ID.",
+      "Get full details of a specific timesheet including client, project, category, times, notes, and billing info. Use the numeric id from list_timesheets.",
     inputSchema: {
       type: "object" as const,
       properties: {
         timesheet_id: {
           type: "number",
-          description: "The ID of the timesheet to retrieve",
+          description: "Numeric timesheet ID from list_timesheets (e.g., 186232353)",
         },
       },
       required: ["timesheet_id"],
@@ -152,49 +152,49 @@ const tools = [
   {
     name: "create_timesheet",
     description:
-      "Create a new timesheet entry. Requires client, project, category, date, and time range. Returns the created timesheet ID.",
+      "Create a new timesheet entry. First use list_clients to find client_id, then list_projects to find project_id, and list_categories to find category_id. The billing rate is automatically fetched based on client. Returns the created timesheet ID on success.",
     inputSchema: {
       type: "object" as const,
       properties: {
         client_id: {
           type: "string",
-          description: "Client ID (use list_clients to find, e.g., 'SSW')",
+          description: "Client ID string from list_clients Value field (e.g., 'SSW', 'LR8R0L')",
         },
         project_id: {
           type: "string",
-          description: "Project ID (use list_projects to find)",
+          description: "Project ID string from list_projects ProjectID field (e.g., 'TP', 'BM1001')",
         },
         category_id: {
           type: "string",
-          description: "Category ID (use list_categories to find, e.g., 'DEV')",
+          description: "Category ID string from list_categories CategoryID field (e.g., 'BOT', 'MTAS', 'WEBDEV')",
         },
         date: {
           type: "string",
-          description: "Date of work in YYYY-MM-DD format",
+          description: "Date of work in YYYY-MM-DD format (e.g., '2025-01-29')",
         },
         start_time: {
           type: "string",
-          description: "Start time in HH:MM format (24-hour)",
+          description: "Start time in 24-hour HH:MM format (e.g., '09:00' for 9am, '14:30' for 2:30pm)",
         },
         end_time: {
           type: "string",
-          description: "End time in HH:MM format (24-hour)",
+          description: "End time in 24-hour HH:MM format (e.g., '17:00' for 5pm, '18:30' for 6:30pm)",
         },
         break_minutes: {
           type: "number",
-          description: "Break time in minutes (default: 0)",
+          description: "Break/lunch time in minutes to subtract from total (e.g., 60 for 1 hour lunch). Default: 0",
         },
         location_id: {
           type: "string",
-          description: "Work location ID (optional)",
+          description: "Location ID from list_locations (e.g., 'SSW' for office, 'Client' for client site, 'Home' for remote)",
         },
         billable_id: {
           type: "string",
-          description: "Billable category ID (optional)",
+          description: "Billable category ID (optional, usually auto-determined)",
         },
         note: {
           type: "string",
-          description: "Description of work done (optional)",
+          description: "Description of work performed (optional but recommended)",
         },
       },
       required: [
@@ -210,53 +210,53 @@ const tools = [
   {
     name: "update_timesheet",
     description:
-      "Update an existing timesheet. All fields except timesheet_id are optional - only provided fields will be updated.",
+      "Update an existing timesheet. Only provide fields you want to change - others will keep their current values. Use get_timesheet first to see current values.",
     inputSchema: {
       type: "object" as const,
       properties: {
         timesheet_id: {
           type: "number",
-          description: "The ID of the timesheet to update",
+          description: "Numeric timesheet ID to update (e.g., 186232353)",
         },
         client_id: {
           type: "string",
-          description: "Client ID",
+          description: "New client ID string (e.g., 'SSW')",
         },
         project_id: {
           type: "string",
-          description: "Project ID",
+          description: "New project ID string (e.g., 'TP')",
         },
         category_id: {
           type: "string",
-          description: "Category ID",
+          description: "New category ID string (e.g., 'BOT')",
         },
         date: {
           type: "string",
-          description: "Date of work in YYYY-MM-DD format",
+          description: "New date in YYYY-MM-DD format",
         },
         start_time: {
           type: "string",
-          description: "Start time in HH:MM format (24-hour)",
+          description: "New start time in HH:MM format (e.g., '09:00')",
         },
         end_time: {
           type: "string",
-          description: "End time in HH:MM format (24-hour)",
+          description: "New end time in HH:MM format (e.g., '17:00')",
         },
         break_minutes: {
           type: "number",
-          description: "Break time in minutes",
+          description: "New break time in minutes",
         },
         location_id: {
           type: "string",
-          description: "Work location ID",
+          description: "New location ID (e.g., 'SSW', 'Client', 'Home')",
         },
         billable_id: {
           type: "string",
-          description: "Billable category ID",
+          description: "New billable category ID",
         },
         note: {
           type: "string",
-          description: "Description of work done",
+          description: "New description of work performed",
         },
       },
       required: ["timesheet_id"],
@@ -264,13 +264,13 @@ const tools = [
   },
   {
     name: "delete_timesheet",
-    description: "Delete a timesheet by its ID.",
+    description: "Permanently delete a timesheet. This cannot be undone.",
     inputSchema: {
       type: "object" as const,
       properties: {
         timesheet_id: {
           type: "number",
-          description: "The ID of the timesheet to delete",
+          description: "Numeric timesheet ID to delete (e.g., 186232353)",
         },
       },
       required: ["timesheet_id"],
