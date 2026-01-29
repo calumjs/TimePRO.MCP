@@ -70,7 +70,7 @@ const tools = [
   {
     name: "list_projects",
     description:
-      "Get projects for a specific client. Returns array with ProjectID (string like 'TP' or 'BM1001') and ProjectName. Use ProjectID as project_id when creating timesheets. NOTE: Multiple projects may have identical names - if unsure which to use, ask the user to confirm the ProjectID. Projects starting with 'zz' or 'yy' are typically archived/old.",
+      "Get projects for a specific client. Returns ProjectID and ProjectName. TIP: If multiple projects exist or names are unclear, use list_timesheets to find recent bookings for this client - reuse the same ProjectID. Projects with star emoji (⭐) are active/common. Projects starting with 'zz' or 'yy' are archived. If still unclear, ask user to confirm.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -118,17 +118,17 @@ const tools = [
   {
     name: "list_timesheets",
     description:
-      "List timesheets for the current user within a date range. Returns calendar-style summary with: id (numeric timesheet ID), title (client and project name), start/end (datetime strings). Use get_timesheet with the id to get full details.",
+      "List user's timesheets in a date range. Returns id, title (shows client + project name), start/end times. USEFUL FOR: 1) Finding which project was used for a client recently (check last few weeks), 2) Verifying timesheet was created, 3) Finding timesheet ID for updates/deletes. Use get_timesheet with id for full details.",
     inputSchema: {
       type: "object" as const,
       properties: {
         start_date: {
           type: "string",
-          description: "Start date in YYYY-MM-DD format (e.g., '2025-01-01')",
+          description: "Start date YYYY-MM-DD (e.g., '2025-01-01'). TIP: Use last 2-4 weeks to find recent project usage",
         },
         end_date: {
           type: "string",
-          description: "End date in YYYY-MM-DD format (e.g., '2025-01-31')",
+          description: "End date YYYY-MM-DD (e.g., '2025-01-31')",
         },
       },
       required: ["start_date", "end_date"],
@@ -152,7 +152,7 @@ const tools = [
   {
     name: "create_timesheet",
     description:
-      "Create a new timesheet entry. First use list_clients to find client_id, then list_projects to find project_id, and list_categories to find category_id. The billing rate is automatically fetched based on client. Default work day is 09:00-18:00 with 60 min break (8 billable hours). Returns the created timesheet ID on success.",
+      "Create a new timesheet entry. WORKFLOW: 1) Use list_clients to find client_id, 2) Use list_projects to find project_id (TIP: if unclear which project, use list_timesheets to check recent bookings for that client and reuse the same project, or infer from work description), 3) Use list_categories to find category_id. Default: 09:00-18:00 with 60 min break = 8 billable hours. Rate and GST (10%) are auto-fetched.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -186,7 +186,7 @@ const tools = [
         },
         location_id: {
           type: "string",
-          description: "Location ID from list_locations (e.g., 'SSW' for office, 'Client' for client site, 'Home' for remote)",
+          description: "REQUIRED. Location ID from list_locations: 'SSW' (office), 'Client' (client site), 'Home' (remote), 'Travel', 'Other'",
         },
         billable_id: {
           type: "string",
@@ -204,6 +204,7 @@ const tools = [
         "date",
         "start_time",
         "end_time",
+        "location_id",
       ],
     },
   },
@@ -300,13 +301,12 @@ function calculateHours(
   return { total, billable: total };
 }
 
-// Helper to format time for API (HH:MM -> HH:MM:SS)
-function formatTime(time: string): string {
-  // If already has seconds, return as-is
-  if (time.split(":").length === 3) {
-    return time;
-  }
-  return `${time}:00`;
+// Helper to format full datetime for API (date + time -> YYYY-MM-DDTHH:MM:SS)
+function formatDateTime(date: string, time: string): string {
+  // Ensure time has seconds
+  const timeParts = time.split(":");
+  const formattedTime = timeParts.length === 3 ? time : `${time}:00`;
+  return `${date}T${formattedTime}`;
 }
 
 // Register tool call handler
@@ -431,7 +431,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const startTime = args?.start_time as string;
         const endTime = args?.end_time as string;
         const breakMinutes = (args?.break_minutes as number) || 0;
-        const locationId = args?.location_id as string | undefined;
+        const locationId = args?.location_id as string;
         const billableId = args?.billable_id as string | undefined;
         const note = args?.note as string | undefined;
 
@@ -441,11 +441,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           !categoryId ||
           !date ||
           !startTime ||
-          !endTime
+          !endTime ||
+          !locationId
         ) {
           throw new McpError(
             ErrorCode.InvalidParams,
-            "client_id, project_id, category_id, date, start_time, and end_time are required"
+            "client_id, project_id, category_id, date, start_time, end_time, and location_id are all required"
           );
         }
 
@@ -470,21 +471,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const rateInfo = await client.getClientRate(clientId);
         const sellPrice = rateInfo.Rate;
 
+        // Convert break from minutes to hours for the API
+        const breakHours = breakMinutes / 60;
+
         const timesheet: TimesheetDto = {
           EmpID: empId,
           ClientID: clientId,
           ProjectID: projectId,
           CategoryID: categoryId,
-          DateCreated: date,
-          StartTime: formatTime(startTime),
-          EndTime: formatTime(endTime),
-          TimeLess: breakMinutes,
-          TimeTotal: total,
-          TimeBillable: billable,
           LocationID: locationId,
           BillableID: billableId,
+          DateCreated: date,
+          TimeStart: formatDateTime(date, startTime),
+          TimeEnd: formatDateTime(date, endTime),
+          TimeLess: breakHours,
+          TimeTotal: total + breakHours,  // Total time including break
+          TimeBillable: billable,
           SellPrice: sellPrice,
-          Note: note,
+          SalesTaxPct: 0.1,  // 10% GST for Australia
+          Notes: note,
         };
 
         const result = await client.createTimesheet(timesheet);
@@ -525,7 +530,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Fetch existing timesheet
         const existing = await client.getTimesheet(timesheetId);
 
-        // Apply updates
+        // Apply updates (existing.TimeLess is in minutes from the API)
         const clientId = (args?.client_id as string) || existing.ClientID;
         const projectId = (args?.project_id as string) || existing.ProjectID;
         const categoryId = (args?.category_id as string) || existing.CategoryID;
@@ -535,7 +540,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const breakMinutes =
           args?.break_minutes !== undefined
             ? (args.break_minutes as number)
-            : existing.TimeLess;
+            : existing.TimeLess;  // Already in minutes from API
         const locationId = (args?.location_id as string) || existing.LocationID;
         const billableId = (args?.billable_id as string) || existing.BillableID;
         const note =
@@ -550,22 +555,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           breakMinutes
         );
 
+        // Convert break from minutes to hours for the API
+        const breakHours = breakMinutes / 60;
+
         const timesheet: TimesheetDto = {
-          TimesheetID: timesheetId,
+          TimeID: timesheetId,
           EmpID: empId,
           ClientID: clientId,
           ProjectID: projectId,
           CategoryID: categoryId,
-          DateCreated: date,
-          StartTime: formatTime(startTime),
-          EndTime: formatTime(endTime),
-          TimeLess: breakMinutes,
-          TimeTotal: total,
-          TimeBillable: billable,
           LocationID: locationId,
           BillableID: billableId,
+          DateCreated: date,
+          TimeStart: formatDateTime(date, startTime),
+          TimeEnd: formatDateTime(date, endTime),
+          TimeLess: breakHours,
+          TimeTotal: total + breakHours,
+          TimeBillable: billable,
           SellPrice: existing.SellPrice,
-          Note: note,
+          SalesTaxPct: existing.SalesTaxPct || 0.1,
+          Notes: note,
         };
 
         await client.updateTimesheet(timesheet);

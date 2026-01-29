@@ -12,7 +12,7 @@ export interface ClientInfo {
 export interface ProjectInfo {
   ProjectID: string;
   ProjectName: string;
-  ClientID: string;
+  ClientID?: string;
 }
 
 // Timesheet category
@@ -47,14 +47,19 @@ export interface TimesheetDefaults {
   ClientID?: string;
   ClientName?: string;
   ProjectID?: string;
-  ProjectName?: string;
+  ProjectType?: string;
   CategoryID?: string;
+  CategoryName?: string;
   LocationID?: string;
+  Location?: string;
   BillableID?: string;
   SellPrice?: number;
-  Categories: CategoryInfo[];
-  Locations: LocationInfo[];
-  Billables: BillableInfo[];
+  SalesTaxPct?: number;
+  PrepaidRate?: number;
+  RegularRate?: number;
+  TimesheetStartTime?: string;
+  TimesheetEndTime?: string;
+  TimeLess?: number;
 }
 
 // Timesheet summary (from list) - calendar-style response
@@ -85,35 +90,38 @@ export interface TimesheetDetails {
   BillableID: string;
   DateCreated: string;
   DateUpdated: string;
-  StartTime: string;
-  EndTime: string;
-  TimeLess: number; // minutes
+  StartTime: string;  // Time portion HH:MM:SS
+  EndTime: string;    // Time portion HH:MM:SS
+  TimeLess: number;   // Minutes in response
   TimeTotal: number;
   TimeBillable: number;
   SellPrice: number;
+  SalesTaxPct: number;
   Note: string;
   IsOverridden: boolean;
   IsOverwriteRate: boolean;
   InvoiceID: string | null;
+  CreatedOn: string;
 }
 
-// DTO for creating/updating timesheets
+// DTO for creating/updating timesheets (matches backend TimesheetsDto)
 export interface TimesheetDto {
-  TimesheetID?: number;
+  TimeID?: number;           // 0 for new, existing ID for update
   EmpID: string;
   ClientID: string;
   ProjectID: string;
   CategoryID: string;
-  LocationID?: string;
+  LocationID: string;        // Required!
   BillableID?: string;
-  DateCreated: string;
-  StartTime: string;
-  EndTime: string;
-  TimeLess: number; // minutes
-  TimeTotal: number;
-  TimeBillable: number;
-  SellPrice?: number;
-  Note?: string;
+  DateCreated: string;       // YYYY-MM-DD format
+  TimeStart: string;         // Full datetime: YYYY-MM-DDTHH:MM:SS
+  TimeEnd: string;           // Full datetime: YYYY-MM-DDTHH:MM:SS
+  TimeLess: number;          // Hours as decimal (e.g., 1.0 for 1 hour)
+  TimeTotal: number;         // Hours
+  TimeBillable: number;      // Hours
+  SellPrice: number;
+  SalesTaxPct: number;       // 0.1 for 10% GST
+  Notes?: string;
 }
 
 // API response wrapper
