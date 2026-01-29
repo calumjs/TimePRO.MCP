@@ -70,7 +70,7 @@ const tools = [
   {
     name: "list_projects",
     description:
-      "Get projects for a specific client. Returns array with ProjectID (string like 'TP' or 'BM1001') and ProjectName. Use ProjectID as project_id when creating timesheets. Must call list_clients first to get the client_id.",
+      "Get projects for a specific client. Returns array with ProjectID (string like 'TP' or 'BM1001') and ProjectName. Use ProjectID as project_id when creating timesheets. NOTE: Multiple projects may have identical names - if unsure which to use, ask the user to confirm the ProjectID. Projects starting with 'zz' or 'yy' are typically archived/old.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -103,7 +103,7 @@ const tools = [
   {
     name: "get_timesheet_defaults",
     description:
-      "Get default values for creating a timesheet, including last used client, project, categories, locations, and billing rates. Useful for pre-populating timesheet forms.",
+      "Get default values based on last timesheet, including client, project, location, and rates. Returns TimesheetStartTime/TimesheetEndTime as suggested work hours. NOTE: Do NOT use TimeLess from this response for break_minutes - it may cause validation errors. Only set break_minutes if user explicitly requests it.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -152,7 +152,7 @@ const tools = [
   {
     name: "create_timesheet",
     description:
-      "Create a new timesheet entry. First use list_clients to find client_id, then list_projects to find project_id, and list_categories to find category_id. The billing rate is automatically fetched based on client. Returns the created timesheet ID on success.",
+      "Create a new timesheet entry. First use list_clients to find client_id, then list_projects to find project_id, and list_categories to find category_id. The billing rate is automatically fetched based on client. Default work day is 09:00-18:00 with 60 min break (8 billable hours). Returns the created timesheet ID on success.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -174,15 +174,15 @@ const tools = [
         },
         start_time: {
           type: "string",
-          description: "Start time in 24-hour HH:MM format (e.g., '09:00' for 9am, '14:30' for 2:30pm)",
+          description: "Start time in 24-hour HH:MM format. Default: '09:00' (9am). Examples: '08:30', '10:00'",
         },
         end_time: {
           type: "string",
-          description: "End time in 24-hour HH:MM format (e.g., '17:00' for 5pm, '18:30' for 6:30pm)",
+          description: "End time in 24-hour HH:MM format. Default: '18:00' (6pm) for 8 billable hours with 1hr break. Examples: '17:00', '18:30'",
         },
         break_minutes: {
           type: "number",
-          description: "Break/lunch time in minutes to subtract from total (e.g., 60 for 1 hour lunch). Default: 0",
+          description: "Break/lunch time in minutes. Standard is 60 (1 hour lunch) for 09:00-18:00 = 8 billable hours. Must be less than total work time. Set to 0 for no break.",
         },
         location_id: {
           type: "string",
@@ -456,6 +456,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           breakMinutes
         );
 
+        // Validate that billable hours is positive
+        if (billable <= 0) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `Invalid time range: break_minutes (${breakMinutes}) exceeds or equals total work time. ` +
+            `Start: ${startTime}, End: ${endTime}, Total hours: ${total + breakMinutes/60}, Break: ${breakMinutes/60} hours. ` +
+            `Billable hours must be positive.`
+          );
+        }
+
         // Get rate for this client (required by TimePRO)
         const rateInfo = await client.getClientRate(clientId);
         const sellPrice = rateInfo.Rate;
@@ -486,7 +496,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 {
                   success: true,
                   timesheet_id: result.TimesheetID,
-                  message: `Timesheet created successfully with ID ${result.TimesheetID}`,
+                  message: `Timesheet created successfully`,
+                  details: {
+                    id: result.TimesheetID,
+                    client: result.ClientName,
+                    project: result.ProjectID,
+                    date: result.DateCreated,
+                    hours: result.TimeBillable,
+                  }
                 },
                 null,
                 2

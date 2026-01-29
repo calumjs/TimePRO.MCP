@@ -155,9 +155,10 @@ export class TimeProClient {
 
   /**
    * Create a new timesheet
+   * Returns the full created timesheet details
    */
-  async createTimesheet(timesheet: TimesheetDto): Promise<{ TimesheetID: number }> {
-    return this.fetch<{ TimesheetID: number }>(
+  async createTimesheet(timesheet: TimesheetDto): Promise<TimesheetDetails> {
+    return this.fetch<TimesheetDetails>(
       "/api/Timesheets/SaveTimesheet?isEdit=false&isSuggested=false",
       {
         method: "POST",
