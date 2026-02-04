@@ -209,6 +209,40 @@ export interface GitCommit {
   source: string;
 }
 
+// GitHub PR/Issue from search API
+export interface GitHubSearchIssuesResponse {
+  total_count: number;
+  incomplete_results: boolean;
+  items: GitHubIssueItem[];
+}
+
+export interface GitHubIssueItem {
+  number: number;
+  title: string;
+  html_url: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  repository_url: string;
+  pull_request?: { url: string };
+  labels: Array<{ name: string }>;
+}
+
+// Normalized PR/Issue
+export interface GitHubActivity {
+  number: number;
+  title: string;
+  url: string;
+  repository: string;
+  state: string;
+  type: "pr_authored" | "pr_reviewed" | "issue";
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  labels: string[];
+}
+
 // Scan result with daily activity grouping
 export interface GitScanResult {
   username: string;
@@ -216,6 +250,9 @@ export interface GitScanResult {
   endDate: string;
   totalCommits: number;
   dailyActivity: DayActivity[];
+  pullRequestsAuthored: GitHubActivity[];
+  pullRequestsReviewed: GitHubActivity[];
+  issuesInvolved: GitHubActivity[];
 }
 
 // Per-day commit summary

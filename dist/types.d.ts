@@ -172,12 +172,48 @@ export interface GitCommit {
     repository: string;
     source: string;
 }
+export interface GitHubSearchIssuesResponse {
+    total_count: number;
+    incomplete_results: boolean;
+    items: GitHubIssueItem[];
+}
+export interface GitHubIssueItem {
+    number: number;
+    title: string;
+    html_url: string;
+    state: string;
+    created_at: string;
+    updated_at: string;
+    closed_at: string | null;
+    repository_url: string;
+    pull_request?: {
+        url: string;
+    };
+    labels: Array<{
+        name: string;
+    }>;
+}
+export interface GitHubActivity {
+    number: number;
+    title: string;
+    url: string;
+    repository: string;
+    state: string;
+    type: "pr_authored" | "pr_reviewed" | "issue";
+    createdAt: string;
+    updatedAt: string;
+    closedAt: string | null;
+    labels: string[];
+}
 export interface GitScanResult {
     username: string;
     startDate: string;
     endDate: string;
     totalCommits: number;
     dailyActivity: DayActivity[];
+    pullRequestsAuthored: GitHubActivity[];
+    pullRequestsReviewed: GitHubActivity[];
+    issuesInvolved: GitHubActivity[];
 }
 export interface DayActivity {
     date: string;

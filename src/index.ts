@@ -325,7 +325,7 @@ const tools = [
   {
     name: "scan_github_commits",
     description:
-      "Scan GitHub for commits authored by a user in a date range. Requires GITHUB_TOKEN environment variable. Returns daily activity grouped by repository with commit details.",
+      "Scan GitHub for commits, PRs authored, PRs reviewed, and issues involved in by a user in a date range. Requires GITHUB_TOKEN environment variable. Returns daily commit activity grouped by repository, plus lists of PRs and issues.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -967,6 +967,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     message: c.message,
                     date: c.date,
                   })) || [],
+                  githubPRsAuthored: githubActivity?.pullRequestsAuthored?.filter(pr => {
+                    const d = pr.createdAt.split("T")[0];
+                    return d === date;
+                  }).map(pr => ({
+                    number: pr.number,
+                    title: pr.title,
+                    repository: pr.repository,
+                    state: pr.state,
+                    url: pr.url,
+                  })) || [],
+                  githubPRsReviewed: githubActivity?.pullRequestsReviewed?.filter(pr => {
+                    const d = pr.updatedAt.split("T")[0];
+                    return d === date;
+                  }).map(pr => ({
+                    number: pr.number,
+                    title: pr.title,
+                    repository: pr.repository,
+                    state: pr.state,
+                    url: pr.url,
+                  })) || [],
+                  githubIssues: githubActivity?.issuesInvolved?.filter(issue => {
+                    const d = issue.updatedAt.split("T")[0];
+                    return d === date;
+                  }).map(issue => ({
+                    number: issue.number,
+                    title: issue.title,
+                    repository: issue.repository,
+                    state: issue.state,
+                    url: issue.url,
+                    labels: issue.labels,
+                  })) || [],
                   recentProjects: recentProjects.slice(0, 10).map(p => ({
                     client: p.Client,
                     clientId: p.ClientID,
@@ -1018,6 +1049,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           suggestedTimesheets: unknown[];
           crmBookings: unknown[];
           githubCommits: unknown[];
+          githubPRsAuthored: unknown[];
+          githubPRsReviewed: unknown[];
+          githubIssues: unknown[];
         }> = [];
 
         let totalExistingHours = 0;
@@ -1081,6 +1115,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             githubCommits: dayCommits?.commits?.map(c => ({
               repository: c.repository,
               message: c.message,
+            })) || [],
+            githubPRsAuthored: githubActivity?.pullRequestsAuthored?.filter(pr => {
+              const d = pr.createdAt.split("T")[0];
+              return d === dayDate;
+            }).map(pr => ({
+              number: pr.number,
+              title: pr.title,
+              repository: pr.repository,
+              state: pr.state,
+              url: pr.url,
+            })) || [],
+            githubPRsReviewed: githubActivity?.pullRequestsReviewed?.filter(pr => {
+              const d = pr.updatedAt.split("T")[0];
+              return d === dayDate;
+            }).map(pr => ({
+              number: pr.number,
+              title: pr.title,
+              repository: pr.repository,
+              state: pr.state,
+              url: pr.url,
+            })) || [],
+            githubIssues: githubActivity?.issuesInvolved?.filter(issue => {
+              const d = issue.updatedAt.split("T")[0];
+              return d === dayDate;
+            }).map(issue => ({
+              number: issue.number,
+              title: issue.title,
+              repository: issue.repository,
+              state: issue.state,
+              url: issue.url,
+              labels: issue.labels,
             })) || [],
           });
         }
