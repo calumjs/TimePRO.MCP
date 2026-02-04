@@ -119,7 +119,7 @@ export class TimeProClient {
      */
     async getSuggestedTimesheets(date) {
         const empId = await this.getEmployeeId();
-        const items = await this.fetch(`/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${date}&end=${date}`);
+        const items = await this.fetch(`/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&start=${date}&end=${date}`);
         return items.filter(item => item.IsSuggested);
     }
     /**
@@ -127,7 +127,7 @@ export class TimeProClient {
      */
     async getTimesheetsDetailed(startDate, endDate) {
         const empId = await this.getEmployeeId();
-        return this.fetch(`/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${startDate}&end=${endDate}`);
+        return this.fetch(`/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&start=${startDate}&end=${endDate}`);
     }
     /**
      * List timesheets for a date range

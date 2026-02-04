@@ -128,16 +128,18 @@ export interface AppointmentItem {
     timeZoneOffsetInMinutes?: number;
 }
 export interface RecentProjectInfo {
-    ClientId: string;
-    ProjectId: string;
-    ClientName: string;
-    ProjectName: string;
-    CategoryId: string;
-    BillableId: string;
+    Client: string;
+    ClientID: string;
+    Project: string;
+    ProjectID: string;
+    Iteration: string;
+    IterationId: number | null;
+    Category: string;
+    CategoryID: string;
+    DateCreated: string;
+    BillableID: string;
     IsBillable: boolean;
-    TotalHours: number;
-    TimesheetCount: number;
-    LastUsed: string;
+    TimesheetWorkType: number;
 }
 export interface GitHubSearchResponse {
     total_count: number;
