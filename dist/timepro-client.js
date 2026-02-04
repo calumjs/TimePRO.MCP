@@ -92,6 +92,44 @@ export class TimeProClient {
         return this.fetch(`/api/Timesheets/GetClientRate?empID=${empId}&clientID=${clientId}`);
     }
     /**
+     * Get billing rate for employee/client on a specific date
+     */
+    async getClientRateForDate(clientId, date) {
+        const empId = await this.getEmployeeId();
+        return this.fetch(`/api/Timesheets/GetClientRate?empID=${empId}&clientID=${clientId}&timesheetDateCreated=${date}`);
+    }
+    /**
+     * Get CRM appointments for an employee in a date range
+     * Note: CRM bookings work only on SSW production environment
+     */
+    async getAppointments(employeeId, startDate, endDate) {
+        const startUnix = Math.floor(new Date(startDate).getTime() / 1000);
+        const endUnix = Math.floor(new Date(endDate).getTime() / 1000);
+        return this.fetch(`/Crm/Appointments?employeeID=${employeeId}&start=${startUnix}&end=${endUnix}`);
+    }
+    /**
+     * Get recent projects for the current employee with full details
+     */
+    async getRecentProjectsDetailed() {
+        const empId = await this.getEmployeeId();
+        return this.fetch(`/api/Projects/GetRecentProjects?empId=${empId}`);
+    }
+    /**
+     * Get suggested timesheets for a date
+     */
+    async getSuggestedTimesheets(date) {
+        const empId = await this.getEmployeeId();
+        const items = await this.fetch(`/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${date}&end=${date}`);
+        return items.filter(item => item.IsSuggested);
+    }
+    /**
+     * Get timesheets with full detail for a date range
+     */
+    async getTimesheetsDetailed(startDate, endDate) {
+        const empId = await this.getEmployeeId();
+        return this.fetch(`/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${startDate}&end=${endDate}`);
+    }
+    /**
      * List timesheets for a date range
      */
     async listTimesheets(startDate, endDate) {

@@ -1,7 +1,7 @@
 /**
  * HTTP client for TimePRO API
  */
-import type { ClientInfo, ProjectInfo, CategoryInfo, LocationInfo, TimesheetDefaults, TimesheetSummary, TimesheetDetails, TimesheetDto, ClientRate } from "./types.js";
+import type { ClientInfo, ProjectInfo, CategoryInfo, LocationInfo, TimesheetDefaults, TimesheetSummary, TimesheetDetails, TimesheetDto, ClientRate, AppointmentItem, RecentProjectInfo, TimesheetListViewItem } from "./types.js";
 export declare class TimeProClient {
     private baseUrl;
     private apiKey;
@@ -41,6 +41,27 @@ export declare class TimeProClient {
      * Get billing rate for employee/client combination
      */
     getClientRate(clientId: string): Promise<ClientRate>;
+    /**
+     * Get billing rate for employee/client on a specific date
+     */
+    getClientRateForDate(clientId: string, date: string): Promise<ClientRate>;
+    /**
+     * Get CRM appointments for an employee in a date range
+     * Note: CRM bookings work only on SSW production environment
+     */
+    getAppointments(employeeId: string, startDate: string, endDate: string): Promise<AppointmentItem[]>;
+    /**
+     * Get recent projects for the current employee with full details
+     */
+    getRecentProjectsDetailed(): Promise<RecentProjectInfo[]>;
+    /**
+     * Get suggested timesheets for a date
+     */
+    getSuggestedTimesheets(date: string): Promise<TimesheetListViewItem[]>;
+    /**
+     * Get timesheets with full detail for a date range
+     */
+    getTimesheetsDetailed(startDate: string, endDate: string): Promise<TimesheetListViewItem[]>;
     /**
      * List timesheets for a date range
      */

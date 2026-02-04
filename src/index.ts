@@ -15,12 +15,20 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { TimeProClient } from "./timepro-client.js";
+import { scanGitHubCommits } from "./github-client.js";
+import {
+  createConfirmation,
+  executeConfirmation,
+} from "./confirmation-service.js";
 import type { TimesheetDto } from "./types.js";
 
 // Configuration from environment variables
 const TIMEPRO_API_URL = process.env.TIMEPRO_API_URL;
 const TIMEPRO_API_KEY = process.env.TIMEPRO_API_KEY;
 const TIMEPRO_TENANT_ID = process.env.TIMEPRO_TENANT_ID;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME;
+const TIMEPRO_CONFIRM_PHRASE = process.env.TIMEPRO_CONFIRM_PHRASE;
 
 if (!TIMEPRO_API_URL || !TIMEPRO_API_KEY || !TIMEPRO_TENANT_ID) {
   console.error(
@@ -70,7 +78,7 @@ const tools = [
   {
     name: "list_projects",
     description:
-      "Get projects for a specific client. Returns ProjectID and ProjectName. TIP: If multiple projects exist or names are unclear, use list_timesheets to find recent bookings for this client - reuse the same ProjectID. Projects with star emoji (⭐) are active/common. Projects starting with 'zz' or 'yy' are archived. If still unclear, ask user to confirm.",
+      "Get projects for a specific client. Returns ProjectID and ProjectName. TIP: If multiple projects exist or names are unclear, use list_timesheets to find recent bookings for this client - reuse the same ProjectID. Projects with star emoji are active/common. Projects starting with 'zz' or 'yy' are archived. If still unclear, ask user to confirm.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -152,7 +160,7 @@ const tools = [
   {
     name: "create_timesheet",
     description:
-      "Create a new timesheet entry. WORKFLOW: 1) Use list_clients to find client_id, 2) Use list_projects to find project_id (TIP: if unclear which project, use list_timesheets to check recent bookings for that client and reuse the same project, or infer from work description), 3) Use list_categories to find category_id. Default: 09:00-18:00 with 60 min break = 8 billable hours. Rate and GST (10%) are auto-fetched.",
+      "Create a new timesheet entry (dry-run by default - returns a confirmation ID that must be confirmed with confirm_operation). WORKFLOW: 1) Use list_clients to find client_id, 2) Use list_projects to find project_id, 3) Use list_categories to find category_id. Default: 09:00-18:00 with 60 min break = 8 billable hours. Rate and GST (10%) are auto-fetched.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -265,7 +273,7 @@ const tools = [
   },
   {
     name: "delete_timesheet",
-    description: "Permanently delete a timesheet. This cannot be undone.",
+    description: "Delete a timesheet (dry-run by default - returns a confirmation ID that must be confirmed with confirm_operation). Shows a preview of the timesheet that will be deleted.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -275,6 +283,108 @@ const tools = [
         },
       },
       required: ["timesheet_id"],
+    },
+  },
+  {
+    name: "get_client_rate",
+    description:
+      "Get the billing rate for the current employee and a specific client, optionally for a specific date. Returns Rate, PrepaidRate, and other billing details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        client_id: {
+          type: "string",
+          description: "Client ID string (e.g., 'SSW', 'LR8R0L')",
+        },
+        date: {
+          type: "string",
+          description: "Optional date in YYYY-MM-DD format to get rate effective on that date. Defaults to today.",
+        },
+      },
+      required: ["client_id"],
+    },
+  },
+  {
+    name: "get_crm_bookings",
+    description:
+      "Fetch CRM appointments/bookings for the current employee. Note: CRM bookings work only on SSW production environment.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: "Start date YYYY-MM-DD. Defaults to Monday of current week.",
+        },
+        end_date: {
+          type: "string",
+          description: "End date YYYY-MM-DD. Defaults to Sunday of current week.",
+        },
+      },
+    },
+  },
+  {
+    name: "scan_github_commits",
+    description:
+      "Scan GitHub for commits authored by a user in a date range. Requires GITHUB_TOKEN environment variable. Returns daily activity grouped by repository with commit details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: {
+          type: "string",
+          description: "GitHub username to scan. Uses GITHUB_USERNAME env var if not provided.",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to scan back from today. Default: 7.",
+        },
+      },
+    },
+  },
+  {
+    name: "recommend_day",
+    description:
+      "Get a daily timesheet recommendation by aggregating: existing timesheets, suggested timesheets, CRM bookings, GitHub commits, and recent projects. Each data source is fetched independently (failures don't block others).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        date: {
+          type: "string",
+          description: "Date in YYYY-MM-DD format. Defaults to today.",
+        },
+      },
+    },
+  },
+  {
+    name: "recommend_week",
+    description:
+      "Get weekly timesheet recommendations. Fetches GitHub commits and recent projects once for the whole week, then per-day: existing timesheets, suggested timesheets, CRM bookings. Returns weekly summary and per-day breakdowns.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: "Start date (Monday) in YYYY-MM-DD format. Defaults to Monday of current week.",
+        },
+      },
+    },
+  },
+  {
+    name: "confirm_operation",
+    description:
+      "Execute a pending dry-run operation (from create_timesheet or delete_timesheet). Validates the confirmation is still pending and not expired, then executes the stored operation.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        confirmation_id: {
+          type: "string",
+          description: "The confirmation ID returned by the dry-run operation.",
+        },
+        passphrase: {
+          type: "string",
+          description: "Required if TIMEPRO_CONFIRM_PHRASE environment variable is set. Must match exactly.",
+        },
+      },
+      required: ["confirmation_id"],
     },
   },
 ];
@@ -307,6 +417,87 @@ function formatDateTime(date: string, time: string): string {
   const timeParts = time.split(":");
   const formattedTime = timeParts.length === 3 ? time : `${time}:00`;
   return `${date}T${formattedTime}`;
+}
+
+// Helper to get today's date as YYYY-MM-DD
+function today(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+// Helper to get Monday of the current week
+function getMonday(dateStr?: string): string {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split("T")[0];
+}
+
+// Helper to get Sunday of the week starting from a Monday
+function getSunday(mondayStr: string): string {
+  const d = new Date(mondayStr);
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().split("T")[0];
+}
+
+// Helper to add days to a date string
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+// Helper to build a TimesheetDto from create_timesheet args
+async function buildTimesheetDto(args: Record<string, unknown>): Promise<TimesheetDto> {
+  const clientId = args.client_id as string;
+  const projectId = args.project_id as string;
+  const categoryId = args.category_id as string;
+  const date = args.date as string;
+  const startTime = args.start_time as string;
+  const endTime = args.end_time as string;
+  const breakMinutes = (args.break_minutes as number) || 0;
+  const locationId = args.location_id as string;
+  const rawBillableId = args.billable_id;
+  const billableId = (typeof rawBillableId === 'string' && rawBillableId.trim() !== '')
+    ? rawBillableId.trim()
+    : undefined;
+  const note = args.note as string | undefined;
+
+  const empId = await client.getEmployeeId();
+  const { total, billable } = calculateHours(startTime, endTime, breakMinutes);
+
+  if (billable <= 0) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Invalid time range: break_minutes (${breakMinutes}) exceeds or equals total work time. ` +
+      `Start: ${startTime}, End: ${endTime}, Total hours: ${total + breakMinutes/60}, Break: ${breakMinutes/60} hours. ` +
+      `Billable hours must be positive.`
+    );
+  }
+
+  const rateInfo = await client.getClientRate(clientId);
+  const sellPrice = rateInfo.Rate;
+  const breakHours = breakMinutes / 60;
+  const defaultBillableId = clientId.toUpperCase() === "SSW" ? "W" : "B";
+  const finalBillableId = billableId || defaultBillableId;
+
+  return {
+    EmpID: empId,
+    ClientID: clientId,
+    ProjectID: projectId,
+    CategoryID: categoryId,
+    LocationID: locationId,
+    BillableID: finalBillableId,
+    DateCreated: date,
+    TimeStart: formatDateTime(date, startTime),
+    TimeEnd: formatDateTime(date, endTime),
+    TimeLess: breakHours,
+    TimeTotal: total + breakHours,
+    TimeBillable: billable,
+    SellPrice: sellPrice,
+    SalesTaxPct: 0.1,
+    Notes: note,
+  };
 }
 
 // Register tool call handler
@@ -430,14 +621,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const date = args?.date as string;
         const startTime = args?.start_time as string;
         const endTime = args?.end_time as string;
-        const breakMinutes = (args?.break_minutes as number) || 0;
         const locationId = args?.location_id as string;
-        // Normalize billable_id: treat empty string, null, undefined all as "not provided"
-        const rawBillableId = args?.billable_id;
-        const billableId = (typeof rawBillableId === 'string' && rawBillableId.trim() !== '')
-          ? rawBillableId.trim()
-          : undefined;
-        const note = args?.note as string | undefined;
 
         if (
           !clientId ||
@@ -454,70 +638,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           );
         }
 
-        const empId = await client.getEmployeeId();
-        const { total, billable } = calculateHours(
-          startTime,
-          endTime,
-          breakMinutes
+        // Build the DTO to validate and get rate info
+        const timesheetDto = await buildTimesheetDto(args as Record<string, unknown>);
+
+        // Create dry-run confirmation
+        const confirmation = createConfirmation(
+          "create_timesheet",
+          `Create timesheet for ${clientId}/${projectId} on ${date} (${startTime}-${endTime})`,
+          {
+            client: clientId,
+            project: projectId,
+            category: categoryId,
+            date,
+            startTime,
+            endTime,
+            breakHours: timesheetDto.TimeLess,
+            billableHours: timesheetDto.TimeBillable,
+            sellPrice: timesheetDto.SellPrice,
+            note: timesheetDto.Notes || "",
+          },
+          { timesheet: timesheetDto }
         );
 
-        // Validate that billable hours is positive
-        if (billable <= 0) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Invalid time range: break_minutes (${breakMinutes}) exceeds or equals total work time. ` +
-            `Start: ${startTime}, End: ${endTime}, Total hours: ${total + breakMinutes/60}, Break: ${breakMinutes/60} hours. ` +
-            `Billable hours must be positive.`
-          );
-        }
-
-        // Get rate for this client (required by TimePRO)
-        const rateInfo = await client.getClientRate(clientId);
-        const sellPrice = rateInfo.Rate;
-
-        // Convert break from minutes to hours for the API
-        const breakHours = breakMinutes / 60;
-
-        // Determine BillableID: SSW = internal (W=WriteOff), others = client work (B=Billable)
-        // This determines the color: W=black (internal), B=green (client work)
-        const defaultBillableId = clientId.toUpperCase() === "SSW" ? "W" : "B";
-        const finalBillableId = billableId || defaultBillableId;
-
-        const timesheet: TimesheetDto = {
-          EmpID: empId,
-          ClientID: clientId,
-          ProjectID: projectId,
-          CategoryID: categoryId,
-          LocationID: locationId,
-          BillableID: finalBillableId,
-          DateCreated: date,
-          TimeStart: formatDateTime(date, startTime),
-          TimeEnd: formatDateTime(date, endTime),
-          TimeLess: breakHours,
-          TimeTotal: total + breakHours,  // Total time including break
-          TimeBillable: billable,
-          SellPrice: sellPrice,
-          SalesTaxPct: 0.1,  // 10% GST for Australia
-          Notes: note,
-        };
-
-        const result = await client.createTimesheet(timesheet);
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify(
                 {
-                  success: true,
-                  timesheet_id: result.TimesheetID,
-                  message: `Timesheet created successfully`,
-                  details: {
-                    id: result.TimesheetID,
-                    client: result.ClientName,
-                    project: result.ProjectID,
-                    date: result.DateCreated,
-                    hours: result.TimeBillable,
-                  }
+                  dryRun: true,
+                  confirmationId: confirmation.id,
+                  expiresAt: confirmation.expiresAt,
+                  message: "Timesheet prepared but NOT yet created. Use confirm_operation with the confirmationId to execute.",
+                  preview: confirmation.preview,
                 },
                 null,
                 2
@@ -617,21 +770,404 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           );
         }
 
-        await client.deleteTimesheet(timesheetId);
+        // Fetch details for preview
+        const existing = await client.getTimesheet(timesheetId);
+
+        // Create dry-run confirmation
+        const confirmation = createConfirmation(
+          "delete_timesheet",
+          `Delete timesheet ${timesheetId} (${existing.ClientName} - ${existing.ProjectID} on ${existing.DateCreated})`,
+          {
+            timesheetId,
+            client: existing.ClientName,
+            project: existing.ProjectID,
+            category: existing.CategoryName,
+            date: existing.DateCreated,
+            startTime: existing.StartTime,
+            endTime: existing.EndTime,
+            billableHours: existing.TimeBillable,
+            note: existing.Note,
+          },
+          { timesheetId }
+        );
+
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify(
                 {
-                  success: true,
-                  message: `Timesheet ${timesheetId} deleted successfully`,
+                  dryRun: true,
+                  confirmationId: confirmation.id,
+                  expiresAt: confirmation.expiresAt,
+                  message: "Timesheet will be deleted when confirmed. Use confirm_operation with the confirmationId to execute.",
+                  preview: confirmation.preview,
                 },
                 null,
                 2
               ),
             },
           ],
+        };
+      }
+
+      case "get_client_rate": {
+        const clientId = args?.client_id as string;
+        if (!clientId) {
+          throw new McpError(ErrorCode.InvalidParams, "client_id is required");
+        }
+        const date = (args?.date as string) || today();
+        const rate = await client.getClientRateForDate(clientId, date);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(rate, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_crm_bookings": {
+        const empId = await client.getEmployeeId();
+        const startDate = (args?.start_date as string) || getMonday();
+        const endDate = (args?.end_date as string) || getSunday(startDate);
+
+        const appointments = await client.getAppointments(empId, startDate, endDate);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  note: "CRM bookings work only on SSW production environment",
+                  startDate,
+                  endDate,
+                  appointments,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "scan_github_commits": {
+        const username = (args?.username as string) || GITHUB_USERNAME;
+        if (!username) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            "username is required (or set GITHUB_USERNAME environment variable)"
+          );
+        }
+        if (!GITHUB_TOKEN) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            "GITHUB_TOKEN environment variable is required for GitHub scanning"
+          );
+        }
+
+        const days = (args?.days as number) || 7;
+        const endDate = today();
+        const startDate = addDays(endDate, -days);
+
+        const result = await scanGitHubCommits(username, startDate, endDate, GITHUB_TOKEN);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "recommend_day": {
+        const date = (args?.date as string) || today();
+        const empId = await client.getEmployeeId();
+
+        // Fetch all data sources independently
+        const [
+          existingResult,
+          suggestedResult,
+          crmResult,
+          githubResult,
+          recentResult,
+        ] = await Promise.allSettled([
+          client.getTimesheetsDetailed(date, date),
+          client.getSuggestedTimesheets(date),
+          client.getAppointments(empId, date, date),
+          (GITHUB_TOKEN && GITHUB_USERNAME)
+            ? scanGitHubCommits(GITHUB_USERNAME, date, date, GITHUB_TOKEN)
+            : Promise.resolve(null),
+          client.getRecentProjectsDetailed(),
+        ]);
+
+        const existingTimesheets = existingResult.status === "fulfilled"
+          ? existingResult.value.filter(t => !t.IsSuggested)
+          : [];
+        const suggestedTimesheets = suggestedResult.status === "fulfilled"
+          ? suggestedResult.value
+          : [];
+        const crmBookings = crmResult.status === "fulfilled"
+          ? crmResult.value
+          : [];
+        const githubActivity = githubResult.status === "fulfilled"
+          ? githubResult.value
+          : null;
+        const recentProjects = recentResult.status === "fulfilled"
+          ? recentResult.value
+          : [];
+
+        const existingHours = existingTimesheets.reduce(
+          (sum, t) => sum + t.TimeBillable, 0
+        );
+        const expectedHours = 8;
+        const hoursNeeded = Math.max(0, expectedHours - existingHours);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  date,
+                  existingHours,
+                  expectedHours,
+                  hoursNeeded,
+                  existingTimesheets: existingTimesheets.map(t => ({
+                    id: t.TimesheetID,
+                    client: t.ClientName,
+                    project: t.ProjectName,
+                    category: t.CategoryName,
+                    hours: t.TimeBillable,
+                    note: t.Note,
+                  })),
+                  suggestedTimesheets: suggestedTimesheets.map(t => ({
+                    client: t.ClientName,
+                    project: t.ProjectName,
+                    category: t.CategoryName,
+                    hours: t.TimeBillable,
+                    note: t.Note,
+                  })),
+                  crmBookings: crmBookings.map(a => ({
+                    title: a.title,
+                    start: a.start,
+                    end: a.end,
+                    clientId: a.clientId,
+                    projectId: a.projectId,
+                  })),
+                  githubCommits: githubActivity?.dailyActivity?.[0]?.commits?.map(c => ({
+                    repository: c.repository,
+                    message: c.message,
+                    date: c.date,
+                  })) || [],
+                  recentProjects: recentProjects.slice(0, 10).map(p => ({
+                    client: p.ClientName,
+                    project: p.ProjectName,
+                    category: p.CategoryId,
+                    totalHours: p.TotalHours,
+                    lastUsed: p.LastUsed,
+                  })),
+                  errors: [
+                    existingResult.status === "rejected" ? `timesheets: ${existingResult.reason}` : null,
+                    suggestedResult.status === "rejected" ? `suggested: ${suggestedResult.reason}` : null,
+                    crmResult.status === "rejected" ? `crm: ${crmResult.reason}` : null,
+                    githubResult.status === "rejected" ? `github: ${githubResult.reason}` : null,
+                    recentResult.status === "rejected" ? `recent: ${recentResult.reason}` : null,
+                  ].filter(Boolean),
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "recommend_week": {
+        const mondayStr = (args?.start_date as string) || getMonday();
+        const sundayStr = getSunday(mondayStr);
+        const empId = await client.getEmployeeId();
+
+        // Fetch week-level data once
+        const [githubResult, recentResult] = await Promise.allSettled([
+          (GITHUB_TOKEN && GITHUB_USERNAME)
+            ? scanGitHubCommits(GITHUB_USERNAME, mondayStr, sundayStr, GITHUB_TOKEN)
+            : Promise.resolve(null),
+          client.getRecentProjectsDetailed(),
+        ]);
+
+        const githubActivity = githubResult.status === "fulfilled" ? githubResult.value : null;
+        const recentProjects = recentResult.status === "fulfilled" ? recentResult.value : [];
+
+        // Fetch per-day data for Mon-Fri
+        const days: Array<{
+          date: string;
+          existingHours: number;
+          expectedHours: number;
+          hoursNeeded: number;
+          existingTimesheets: unknown[];
+          suggestedTimesheets: unknown[];
+          crmBookings: unknown[];
+          githubCommits: unknown[];
+        }> = [];
+
+        let totalExistingHours = 0;
+        const totalExpectedHours = 40; // 5 days x 8 hours
+
+        for (let i = 0; i < 5; i++) {
+          const dayDate = addDays(mondayStr, i);
+
+          const [existingResult, suggestedResult, crmResult] = await Promise.allSettled([
+            client.getTimesheetsDetailed(dayDate, dayDate),
+            client.getSuggestedTimesheets(dayDate),
+            client.getAppointments(empId, dayDate, dayDate),
+          ]);
+
+          const existingTimesheets = existingResult.status === "fulfilled"
+            ? existingResult.value.filter(t => !t.IsSuggested)
+            : [];
+          const suggestedTimesheets = suggestedResult.status === "fulfilled"
+            ? suggestedResult.value
+            : [];
+          const crmBookings = crmResult.status === "fulfilled"
+            ? crmResult.value
+            : [];
+
+          const existingHours = existingTimesheets.reduce(
+            (sum, t) => sum + t.TimeBillable, 0
+          );
+          totalExistingHours += existingHours;
+
+          // Find GitHub commits for this day
+          const dayCommits = githubActivity?.dailyActivity?.find(d => d.date === dayDate);
+
+          days.push({
+            date: dayDate,
+            existingHours,
+            expectedHours: 8,
+            hoursNeeded: Math.max(0, 8 - existingHours),
+            existingTimesheets: existingTimesheets.map(t => ({
+              id: t.TimesheetID,
+              client: t.ClientName,
+              project: t.ProjectName,
+              hours: t.TimeBillable,
+              note: t.Note,
+            })),
+            suggestedTimesheets: suggestedTimesheets.map(t => ({
+              client: t.ClientName,
+              project: t.ProjectName,
+              hours: t.TimeBillable,
+              note: t.Note,
+            })),
+            crmBookings: crmBookings.map(a => ({
+              title: a.title,
+              start: a.start,
+              end: a.end,
+              clientId: a.clientId,
+            })),
+            githubCommits: dayCommits?.commits?.map(c => ({
+              repository: c.repository,
+              message: c.message,
+            })) || [],
+          });
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  weekStart: mondayStr,
+                  weekEnd: sundayStr,
+                  summary: {
+                    existingHours: totalExistingHours,
+                    expectedHours: totalExpectedHours,
+                    hoursNeeded: Math.max(0, totalExpectedHours - totalExistingHours),
+                    complete: totalExistingHours >= totalExpectedHours,
+                  },
+                  days,
+                  recentProjects: recentProjects.slice(0, 10).map(p => ({
+                    client: p.ClientName,
+                    project: p.ProjectName,
+                    category: p.CategoryId,
+                    totalHours: p.TotalHours,
+                    lastUsed: p.LastUsed,
+                  })),
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case "confirm_operation": {
+        const confirmationId = args?.confirmation_id as string;
+        if (!confirmationId) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            "confirmation_id is required"
+          );
+        }
+
+        // Check passphrase if required
+        if (TIMEPRO_CONFIRM_PHRASE) {
+          const passphrase = args?.passphrase as string;
+          if (passphrase !== TIMEPRO_CONFIRM_PHRASE) {
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              "Invalid or missing passphrase. TIMEPRO_CONFIRM_PHRASE is configured and must be provided."
+            );
+          }
+        }
+
+        const result = await executeConfirmation(
+          confirmationId,
+          async (payload) => {
+            // Determine which operation to execute based on the payload
+            if ("timesheet" in payload) {
+              // create_timesheet
+              const timesheetDto = payload.timesheet as TimesheetDto;
+              const created = await client.createTimesheet(timesheetDto);
+              return {
+                success: true,
+                timesheet_id: created.TimesheetID,
+                message: "Timesheet created successfully",
+                details: {
+                  id: created.TimesheetID,
+                  client: created.ClientName,
+                  project: created.ProjectID,
+                  date: created.DateCreated,
+                  hours: created.TimeBillable,
+                },
+              };
+            } else if ("timesheetId" in payload) {
+              // delete_timesheet
+              const tsId = payload.timesheetId as number;
+              await client.deleteTimesheet(tsId);
+              return {
+                success: true,
+                message: `Timesheet ${tsId} deleted successfully`,
+              };
+            } else {
+              throw new Error("Unknown operation payload");
+            }
+          }
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+          isError: !result.success,
         };
       }
 

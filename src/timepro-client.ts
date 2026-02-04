@@ -12,6 +12,9 @@ import type {
   TimesheetDetails,
   TimesheetDto,
   ClientRate,
+  AppointmentItem,
+  RecentProjectInfo,
+  TimesheetListViewItem,
 } from "./types.js";
 
 export class TimeProClient {
@@ -128,6 +131,57 @@ export class TimeProClient {
     const empId = await this.getEmployeeId();
     return this.fetch<ClientRate>(
       `/api/Timesheets/GetClientRate?empID=${empId}&clientID=${clientId}`
+    );
+  }
+
+  /**
+   * Get billing rate for employee/client on a specific date
+   */
+  async getClientRateForDate(clientId: string, date: string): Promise<ClientRate> {
+    const empId = await this.getEmployeeId();
+    return this.fetch<ClientRate>(
+      `/api/Timesheets/GetClientRate?empID=${empId}&clientID=${clientId}&timesheetDateCreated=${date}`
+    );
+  }
+
+  /**
+   * Get CRM appointments for an employee in a date range
+   * Note: CRM bookings work only on SSW production environment
+   */
+  async getAppointments(employeeId: string, startDate: string, endDate: string): Promise<AppointmentItem[]> {
+    const startUnix = Math.floor(new Date(startDate).getTime() / 1000);
+    const endUnix = Math.floor(new Date(endDate).getTime() / 1000);
+    return this.fetch<AppointmentItem[]>(
+      `/Crm/Appointments?employeeID=${employeeId}&start=${startUnix}&end=${endUnix}`
+    );
+  }
+
+  /**
+   * Get recent projects for the current employee with full details
+   */
+  async getRecentProjectsDetailed(): Promise<RecentProjectInfo[]> {
+    const empId = await this.getEmployeeId();
+    return this.fetch<RecentProjectInfo[]>(`/api/Projects/GetRecentProjects?empId=${empId}`);
+  }
+
+  /**
+   * Get suggested timesheets for a date
+   */
+  async getSuggestedTimesheets(date: string): Promise<TimesheetListViewItem[]> {
+    const empId = await this.getEmployeeId();
+    const items = await this.fetch<TimesheetListViewItem[]>(
+      `/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${date}&end=${date}`
+    );
+    return items.filter(item => item.IsSuggested);
+  }
+
+  /**
+   * Get timesheets with full detail for a date range
+   */
+  async getTimesheetsDetailed(startDate: string, endDate: string): Promise<TimesheetListViewItem[]> {
+    const empId = await this.getEmployeeId();
+    return this.fetch<TimesheetListViewItem[]>(
+      `/api/Timesheets/GetTimesheetListViewModel?empID=${empId}&start=${startDate}&end=${endDate}`
     );
   }
 
