@@ -247,24 +247,29 @@ export interface ConfirmationResult {
 }
 
 // Timesheet list view model item (from GetTimesheetListViewModel)
+// Field names match C# TimesheetListViewItem with [PascalCasedApiMethod]
 export interface TimesheetListViewItem {
-  TimesheetID: number;
+  TimeID: number;
   EmpID: string;
-  ClientID: string;
-  ClientName: string;
+  EmpName: string;
+  Client: string;
+  ClientId: string;
+  Project: string;
   ProjectID: string;
-  ProjectName: string;
-  CategoryID: string;
-  CategoryName: string;
+  Iteration: string;
+  Category: string;
+  Location: string;
   LocationID: string;
-  BillableID: string;
-  DateCreated: string;
+  Notes: string;
+  Date: string;
   StartTime: string;
   EndTime: string;
-  TimeLess: number;
+  BillableID: string;
+  IsBillable: boolean;
+  Less: number;
   TotalTime: number;
-  TimeBillable: number;
-  SellPrice: number;
-  Note: string;
+  HasNotes: boolean;
   IsSuggested: boolean;
+  IsLeave: boolean;
+  InputSource: number | null;
 }

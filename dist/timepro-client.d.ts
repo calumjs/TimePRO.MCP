@@ -59,9 +59,9 @@ export declare class TimeProClient {
      */
     getSuggestedTimesheets(date: string): Promise<TimesheetListViewItem[]>;
     /**
-     * Get timesheets with full detail for a date range
+     * Get timesheets with full detail for a date
      */
-    getTimesheetsDetailed(startDate: string, endDate: string): Promise<TimesheetListViewItem[]>;
+    getTimesheetsDetailed(date: string): Promise<TimesheetListViewItem[]>;
     /**
      * List timesheets for a date range
      */

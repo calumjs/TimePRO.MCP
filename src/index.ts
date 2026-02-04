@@ -895,7 +895,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           githubResult,
           recentResult,
         ] = await Promise.allSettled([
-          client.getTimesheetsDetailed(date, date),
+          client.getTimesheetsDetailed(date),
           client.getSuggestedTimesheets(date),
           client.getAppointments(empId, date, date),
           (GITHUB_TOKEN && GITHUB_USERNAME)
@@ -921,7 +921,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           : [];
 
         const existingHours = existingTimesheets.reduce(
-          (sum, t) => sum + t.TimeBillable, 0
+          (sum, t) => sum + t.TotalTime, 0
         );
         const expectedHours = 8;
         const hoursNeeded = Math.max(0, expectedHours - existingHours);
@@ -937,19 +937,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   expectedHours,
                   hoursNeeded,
                   existingTimesheets: existingTimesheets.map(t => ({
-                    id: t.TimesheetID,
-                    client: t.ClientName,
-                    project: t.ProjectName,
-                    category: t.CategoryName,
-                    hours: t.TimeBillable,
-                    note: t.Note,
+                    id: t.TimeID,
+                    client: t.Client,
+                    clientId: t.ClientId,
+                    project: t.Project,
+                    projectId: t.ProjectID,
+                    category: t.Category,
+                    hours: t.TotalTime,
+                    note: t.Notes,
                   })),
                   suggestedTimesheets: suggestedTimesheets.map(t => ({
-                    client: t.ClientName,
-                    project: t.ProjectName,
-                    category: t.CategoryName,
-                    hours: t.TimeBillable,
-                    note: t.Note,
+                    client: t.Client,
+                    clientId: t.ClientId,
+                    project: t.Project,
+                    projectId: t.ProjectID,
+                    category: t.Category,
+                    hours: t.TotalTime,
+                    note: t.Notes,
                   })),
                   crmBookings: crmBookings.map(a => ({
                     title: a.title,
@@ -1023,7 +1027,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const dayDate = addDays(mondayStr, i);
 
           const [existingResult, suggestedResult, crmResult] = await Promise.allSettled([
-            client.getTimesheetsDetailed(dayDate, dayDate),
+            client.getTimesheetsDetailed(dayDate),
             client.getSuggestedTimesheets(dayDate),
             client.getAppointments(empId, dayDate, dayDate),
           ]);
@@ -1039,7 +1043,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             : [];
 
           const existingHours = existingTimesheets.reduce(
-            (sum, t) => sum + t.TimeBillable, 0
+            (sum, t) => sum + t.TotalTime, 0
           );
           totalExistingHours += existingHours;
 
@@ -1052,17 +1056,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             expectedHours: 8,
             hoursNeeded: Math.max(0, 8 - existingHours),
             existingTimesheets: existingTimesheets.map(t => ({
-              id: t.TimesheetID,
-              client: t.ClientName,
-              project: t.ProjectName,
-              hours: t.TimeBillable,
-              note: t.Note,
+              id: t.TimeID,
+              client: t.Client,
+              clientId: t.ClientId,
+              project: t.Project,
+              projectId: t.ProjectID,
+              hours: t.TotalTime,
+              note: t.Notes,
             })),
             suggestedTimesheets: suggestedTimesheets.map(t => ({
-              client: t.ClientName,
-              project: t.ProjectName,
-              hours: t.TimeBillable,
-              note: t.Note,
+              client: t.Client,
+              clientId: t.ClientId,
+              project: t.Project,
+              projectId: t.ProjectID,
+              hours: t.TotalTime,
+              note: t.Notes,
             })),
             crmBookings: crmBookings.map(a => ({
               title: a.title,

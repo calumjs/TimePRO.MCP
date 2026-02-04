@@ -170,18 +170,18 @@ export class TimeProClient {
   async getSuggestedTimesheets(date: string): Promise<TimesheetListViewItem[]> {
     const empId = await this.getEmployeeId();
     const items = await this.fetch<TimesheetListViewItem[]>(
-      `/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&start=${date}&end=${date}`
+      `/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&date=${date}`
     );
     return items.filter(item => item.IsSuggested);
   }
 
   /**
-   * Get timesheets with full detail for a date range
+   * Get timesheets with full detail for a date
    */
-  async getTimesheetsDetailed(startDate: string, endDate: string): Promise<TimesheetListViewItem[]> {
+  async getTimesheetsDetailed(date: string): Promise<TimesheetListViewItem[]> {
     const empId = await this.getEmployeeId();
     return this.fetch<TimesheetListViewItem[]>(
-      `/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&start=${startDate}&end=${endDate}`
+      `/api/Timesheets/GetTimesheetListViewModel?employeeID=${empId}&date=${date}`
     );
   }
 
