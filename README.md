@@ -1,6 +1,9 @@
-# TimePRO MCP Server
+# TimePro MCP Server
 
-An MCP (Model Context Protocol) server that wraps the TimePRO API, enabling AI assistants to automatically create and manage timesheets on behalf of authenticated users.
+An MCP (Model Context Protocol) server that wraps the TimePro API, enabling AI assistants to automatically create and manage timesheets on behalf of authenticated users.
+
+ [![Demo video](https://img.youtube.com/vi/NRekKgVbQno/hqdefault.jpg)](https://youtu.be/NRekKgVbQno)
+Watch the video above for more information.
 
 ## Features
 
@@ -51,7 +54,7 @@ The server requires three environment variables:
 
 ### How to Get Your API Key
 
-1. **Log into TimePRO**: Go to your TimePRO instance and sign in
+1. **Log into TimePRO**: Go to your TimePro instance and sign in
 2. **Navigate to API Key page**: Go to **Admin > API Key**
 3. **Generate or Copy Key**: If you already have a key, it will be displayed. Click "Generate" to create a new key if needed.
 4. **Copy the key**: Store it securely
@@ -59,7 +62,7 @@ The server requires three environment variables:
 ### How to Find Your Tenant ID
 
 The tenant ID is visible in:
-1. The URL when logged into TimePRO (e.g., `https://ssw.sswtimepro.com/b/ssw/...` - tenant is "ssw")
+1. The URL when logged into TimePro (e.g., `https://ssw.sswtimepro.com/b/ssw/...` - tenant is "ssw")
 2. The `x-timepro-tenant-id` header in browser dev tools (Network tab)
 3. Ask your TimePRO administrator
 
@@ -177,7 +180,7 @@ Ensure all three environment variables are set in your Claude Desktop config.
 ### "TimePRO API error (401)"
 Your API key may be invalid or expired. Generate a new one from TimePRO Admin > API Key.
 
-### "TimePRO API error (403)"
+### "TimePro API error (403)"
 Your user account may not have permission for the requested operation.
 
 ### Connection issues
