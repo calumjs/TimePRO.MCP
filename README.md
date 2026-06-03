@@ -2,7 +2,8 @@
 
 An MCP (Model Context Protocol) server that wraps the TimePro API, enabling AI assistants to automatically create and manage timesheets on behalf of authenticated users.
 
- [![Demo video](https://img.youtube.com/vi/NRekKgVbQno/hqdefault.jpg)](https://youtu.be/NRekKgVbQno)
+[![Demo video](https://img.youtube.com/vi/NRekKgVbQno/hqdefault.jpg)](https://youtu.be/NRekKgVbQno)
+
 Watch the video above for more information.
 
 ## Features
